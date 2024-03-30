@@ -8,7 +8,7 @@ import (
 	"net/http"
 	"net/url"
 
-	"github.com/samiam2013/crossfire/history"
+	"github.com/samiam2013/crossfire/pkg/history"
 	log "github.com/sirupsen/logrus"
 )
 

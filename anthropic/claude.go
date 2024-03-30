@@ -8,7 +8,7 @@ import (
 	"io"
 	"net/http"
 
-	"github.com/samiam2013/crossfire/history"
+	"github.com/samiam2013/crossfire/pkg/history"
 )
 
 type API struct {
