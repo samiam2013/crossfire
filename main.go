@@ -2,6 +2,7 @@ package main
 
 import (
 	"os"
+	"time"
 
 	"github.com/joho/godotenv"
 	"github.com/samiam2013/crossfire/anthropic"
@@ -24,12 +25,21 @@ func main() {
 		log.Fatalf("ANTHROPIC_API_KEY env var is not set")
 	}
 
-	voice.Say("welcome to crossfire", voice.WithVoice(voice.Daniel))
+	debateTopic := "'vanilla' Javascript is better than React" // simulation theory suggested by copilot
+
+	talkingStick := make(chan struct{})
+	go func(ts chan struct{}) {
+		voice.Say("Welcome to crossfire, I'm your host Daniel representing Open AI's Chat GPT", voice.WithVoice(voice.Daniel))
+		time.Sleep(500 * time.Millisecond)
+		voice.Say("And I'm your co-host Karen, representing Anthropic's Claude. The topic of today's debate?: ", voice.WithVoice(voice.Karen))
+		time.Sleep(500 * time.Millisecond)
+		voice.Say(debateTopic, voice.WithVoice(voice.Daniel))
+		voice.Say("I'll be taking the affirmative position", voice.WithVoice(voice.Karen))
+		voice.Say("And I'll be taking the opposing position", voice.WithVoice(voice.Daniel))
+		ts <- struct{}{}
+	}(talkingStick)
 	oAPI := openai.NewAPI(oAPIkey)
 	anthAPI := anthropic.NewAPI(anthAPIkey)
-
-	debateTopic := "multi-level polymorphic inheritance is bad in software code" // simulation theory suggested by copilot
-	voice.Say("The topic of today's debate is: "+debateTopic, voice.WithVoice(voice.Karen))
 
 	hist := history.NewMessageHistory()
 	anthResp, err := anthAPI.GetMessageResponse("Make your best case for '"+debateTopic+"' is true", hist)
@@ -42,9 +52,9 @@ func main() {
 	}
 	hist.Add(history.AuthorClaude, contentStr)
 
-	talkingStick := make(chan struct{})
+	<-talkingStick
 	go func(ts chan struct{}) {
-		voice.Say("The first argument by claude for '"+debateTopic+"' being true: "+contentStr, voice.WithVoice(voice.Karen))
+		voice.Say(contentStr, voice.WithVoice(voice.Karen))
 		ts <- struct{}{}
 	}(talkingStick)
 
@@ -62,7 +72,7 @@ func main() {
 		hist.Add(history.AuthorOpenAI, oAPIFirstContent)
 		<-talkingStick
 		go func(ts chan struct{}) {
-			voice.Say("The response argument by open ai: "+oAPIFirstContent, voice.WithVoice(voice.Daniel))
+			voice.Say(oAPIFirstContent, voice.WithVoice(voice.Daniel))
 			ts <- struct{}{}
 		}(talkingStick)
 
@@ -80,9 +90,8 @@ func main() {
 
 		<-talkingStick
 		go func(ts chan struct{}) {
-			voice.Say("The response argument by claude: "+contentStr, voice.WithVoice(voice.Karen))
+			voice.Say(contentStr, voice.WithVoice(voice.Karen))
 			ts <- struct{}{}
 		}(talkingStick)
-
 	}
 }
