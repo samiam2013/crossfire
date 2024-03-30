@@ -2,7 +2,7 @@
 
 A dumb little project to get AI LLMs to fight one another
 
-name inspired by this youtube video of a show on CNN until Jon Stewart destroyed the premise of the show, live. https://www.youtube.com/watch?v=aFQFB5YpDZE&t=2s
+Name inspired by this youtube video of a show that ran on CNN until Jon Stewart destroyed the premise of the show, live. https://www.youtube.com/watch?v=aFQFB5YpDZE&t=2s
 
 needs a `.env` in the root folder, there's an example. 
 
