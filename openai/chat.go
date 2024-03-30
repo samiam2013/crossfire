@@ -8,6 +8,7 @@ import (
 	"net/http"
 	"net/url"
 
+	"github.com/samiam2013/crossfire/history"
 	log "github.com/sirupsen/logrus"
 )
 
@@ -47,6 +48,13 @@ type ChatCompletionResponse struct {
 	SystemFingerprint string `json:"system_fingerprint"`
 }
 
+func (ccp ChatCompletionResponse) FirstContent() (string, error) {
+	if len(ccp.Choices) == 0 {
+		return "", fmt.Errorf("no choices in completion response")
+	}
+	return ccp.Choices[0].Message.Content, nil
+}
+
 type API struct {
 	openAIKey string
 }
@@ -57,18 +65,26 @@ func NewAPI(openAIKey string) *API {
 	}
 }
 
-func (a *API) GetCompletion(userInput string) (c ChatCompletionResponse, err error) {
+func (a *API) GetCompletion(userInput string, hist history.MessageHistory) (c ChatCompletionResponse, err error) {
+	msgs := make([]ChatMessage, 0)
+	msgs = append(msgs, ChatMessage{
+		Role:    "system",
+		Content: "you are a large language model used for debating ideas as concisely (short responses) as possible",
+	})
+	for _, msg := range hist {
+		if msg.Author == history.AuthorOpenAI {
+			msgs = append(msgs, ChatMessage{Role: "system", Content: msg.Content})
+		} else {
+			msgs = append(msgs, ChatMessage{Role: "user", Content: msg.Content})
+		}
+	}
 	requestData := ChatCompletionRequest{
 		Model: "gpt-4-turbo-preview",
-		// Format: ResponseFormat{
-		// 	Type: "json_object"},
-		Messages: []ChatMessage{{
-			Role:    "system",
-			Content: "you are a large language model used for debating ideas as concisely (short responses) as possible",
-		}, {
+		Messages: append(msgs, ChatMessage{
 			Role:    "user",
 			Content: userInput,
-		}}}
+		}),
+	}
 	jsonData, err := json.Marshal(requestData)
 	if err != nil {
 		return c, fmt.Errorf("error marshaling JSON: %w", err)
@@ -132,7 +148,7 @@ func (a *API) GetUSAddressSorted(input string) (sa Address, err error) {
 	textPrompt := "please make a JSON response that will unmarshall this address `" + input + "` in this go struct format " +
 		goTypePrompt + " and be liberal about normalizing to colloquial US address formatting"
 
-	completion, err := a.GetCompletion(textPrompt)
+	completion, err := a.GetCompletion(textPrompt, history.NewMessageHistory())
 	if err != nil {
 		return sa, fmt.Errorf("error getting completion: %v", err)
 	}

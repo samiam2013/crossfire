@@ -4,10 +4,11 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 
-	log "github.com/sirupsen/logrus"
+	"github.com/samiam2013/crossfire/history"
 )
 
 type API struct {
@@ -20,21 +21,6 @@ func NewAPI(anthropicKey string) *API {
 	}
 }
 
-/*
-	curl https://api.anthropic.com/v1/messages \
-	     --header "x-api-key: $ANTHROPIC_API_KEY" \
-	     --header "anthropic-version: 2023-06-01" \
-	     --header "content-type: application/json" \
-	     --data \
-
-	'{
-	    "model": "claude-3-opus-20240229",
-	    "max_tokens": 1024,
-	    "messages": [
-	        {"role": "user", "content": "Hello, world"}
-	    ]
-	}'
-*/
 type MessageRequest struct {
 	Model     string    `json:"model"`
 	MaxTokens int       `json:"max_tokens"`
@@ -46,26 +32,6 @@ type Message struct {
 	Content string `json:"content"`
 }
 
-/*
-	{
-		"content": [
-		  {
-			"text": "Hi! My name is Claude.",
-			"type": "text"
-		  }
-		],
-		"id": "msg_013Zva2CMHLNnXjNJJKqJ2EF",
-		"model": "claude-3-opus-20240229",
-		"role": "assistant",
-		"stop_reason": "end_turn",
-		"stop_sequence": null,
-		"type": "message",
-		"usage": {
-		  "input_tokens": 10,
-		  "output_tokens": 25
-		}
-	  }
-*/
 type MessageResponse struct {
 	Content []struct {
 		Text string `json:"text"`
@@ -83,14 +49,41 @@ type MessageResponse struct {
 	} `json:"usage"`
 }
 
-func (a API) GetMessageResponse(prompt string) (mr MessageResponse, err error) {
+func (mr MessageResponse) FirstContent() (string, error) {
+	if len(mr.Content) == 0 {
+		return "", fmt.Errorf("no content (length 0) in message response")
+	}
+	return mr.Content[0].Text, nil
+}
+
+func (a API) GetMessageResponse(prompt string, hist history.MessageHistory) (mr MessageResponse, err error) {
+	msgs := make([]Message, 0)
+	msgs = append(msgs, Message{
+		Role:    "user",
+		Content: prompt,
+	})
+	for _, h := range hist {
+		if h.Author == history.AuthorClaude {
+			msgs = append(msgs, Message{
+				Role:    "assistant",
+				Content: h.Content,
+			})
+		} else {
+			msgs = append(msgs, Message{
+				Role:    "user",
+				Content: h.Content,
+			})
+		}
+	}
+
 	msg := MessageRequest{
 		Model:     "claude-3-opus-20240229",
-		MaxTokens: 1024,
-		Messages: []Message{{
-			Role:    "user",
-			Content: prompt,
-		}},
+		MaxTokens: 1000,
+		Messages: append(msgs, Message{
+			Role: "assistant",
+			Content: "Hi! My name is Claude. I'm a debate assistant. I will very very concisely (short messages) respond to a prompt." +
+				"I might not agree with the side I'm arguing for, but I'll do my best to make a compelling argument:",
+		}),
 	}
 	marshalled, err := json.Marshal(msg)
 	if err != nil {
@@ -114,12 +107,15 @@ func (a API) GetMessageResponse(prompt string) (mr MessageResponse, err error) {
 	defer func() { _ = resp.Body.Close() }()
 
 	byts, err := io.ReadAll(resp.Body)
-	log.Infof("response body: %s", string(byts))
+	if resp.StatusCode != http.StatusOK {
+		return mr, fmt.Errorf("failure status code (!200): %d", resp.StatusCode)
+	}
 	if err != nil {
 		return mr, errors.Join(err, errors.New("failed to read response body"))
 	}
 	if err := json.Unmarshal(byts, &mr); err != nil {
 		return mr, errors.Join(err, errors.New("failed to unmarshal response"))
 	}
+
 	return mr, nil
 }
