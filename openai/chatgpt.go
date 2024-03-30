@@ -7,6 +7,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 
 	"github.com/samiam2013/crossfire/pkg/history"
 	log "github.com/sirupsen/logrus"
@@ -52,7 +53,8 @@ func (ccp ChatCompletionResponse) FirstContent() (string, error) {
 	if len(ccp.Choices) == 0 {
 		return "", fmt.Errorf("no choices in completion response")
 	}
-	return ccp.Choices[0].Message.Content, nil
+	sanitized := strings.ReplaceAll(ccp.Choices[0].Message.Content, "**", "")
+	return sanitized, nil
 }
 
 type API struct {
@@ -119,44 +121,4 @@ func (a *API) GetCompletion(userInput string, hist history.MessageHistory) (c Ch
 		log.Fatalf("Error decoding JSON response: %v", err)
 	}
 	return c, nil
-}
-
-type Address struct {
-	Number        string `json:"number"`
-	StreetAddress string `json:"street_address"`
-	Unit          string `json:"unit"`
-	City          string `json:"city"`
-	State         string `json:"state"`
-	ZipCode       string `json:"zip_code"`
-	Country       string `json:"country"`
-}
-
-func (a *API) GetUSAddressSorted(input string) (sa Address, err error) {
-	goTypePrompt := "```go\n" +
-		"type Address struct {\n" +
-		"	Number 		  string    `json:\"number\"`\n" +
-		"	StreetAddress string `json:\"street_address\"// add periods after abbreviations`\n" +
-		"   Unit 		  string `json:\"unit\"`\n" +
-		"	City          string `json:\"city\"`\n" +
-		"	State         string `json:\"state\"`// 2-letter state code\n" +
-		"	ZipCode       string `json:\"zip_code\"` // no local route codes\n" +
-		"	Country       string `json:\"country\"` // 2-letter country code\n" +
-		"}\n" +
-		"```"
-
-	// create a prompt with a go type for a US address and a field if it's foreign
-	textPrompt := "please make a JSON response that will unmarshall this address `" + input + "` in this go struct format " +
-		goTypePrompt + " and be liberal about normalizing to colloquial US address formatting"
-
-	completion, err := a.GetCompletion(textPrompt, history.NewMessageHistory())
-	if err != nil {
-		return sa, fmt.Errorf("error getting completion: %v", err)
-	}
-	content := completion.Choices[0].Message.Content
-	log.Printf("Completion: %s", content)
-
-	if err := json.Unmarshal([]byte(content), &sa); err != nil {
-		return sa, fmt.Errorf("error unmarshaling JSON: %v", err)
-	}
-	return
 }
