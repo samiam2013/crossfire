@@ -36,8 +36,11 @@ func Say(text string, opts ...Option) {
 	if vc.voice == "" {
 		vc.voice = Karen
 	}
-	if vc.volume == 0.0 || vc.volume > 1.0 || vc.volume < 0.0 {
+	if vc.volume == 0.0 {
 		vc.volume = 1.0
+	} else if vc.volume > 1.0 || vc.volume < 0.0 {
+		vc.volume = 1.0
+		log.Warnf("volume must be between 0.0 and 1.0, defaulting to 1.0")
 	}
 	fmt.Println(text + "\n\n")
 
