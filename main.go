@@ -25,7 +25,7 @@ func main() {
 		log.Fatalf("ANTHROPIC_API_KEY env var is not set")
 	}
 
-	debateTopic := "'vanilla' Javascript is better than React" // simulation theory suggested by copilot
+	debateTopic := "minecraft is better than stardew valley" // simulation theory suggested by copilot
 
 	talkingStick := make(chan struct{})
 	go func(ts chan struct{}) {
